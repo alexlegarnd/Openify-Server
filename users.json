@@ -2,7 +2,8 @@
   "users": [
     {
       "username": "admin",
-      "password": "<bcrypt_here>"
+      "password": "$2y$10$HVHVP/A2U5GUfXsPk0FR7ugPT5yjkVIgWiIQHlmbJBJz/OO4BrA/a",
+      "administrator": true
     }
   ]
 }

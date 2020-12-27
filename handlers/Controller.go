@@ -1,59 +1,68 @@
-package handlers
+package Handlers
 
 import (
-	"Openify/authentication"
-	"Openify/managers"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dhowden/tag"
 	"log"
 	"net/http"
+	"openify/ConfigurationManager"
+	"openify/Response"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
+
+	"openify/Authentication"
+	"openify/FilesManager"
+
+	"github.com/dhowden/tag"
 )
 
 type Metadata struct {
-	Title string `json:"title"`
-	Album string `json:"album"`
-	Artist string `json:"artist"`
+	Title       string `json:"title"`
+	Album       string `json:"album"`
+	Artist      string `json:"artist"`
 	AlbumArtist string `json:"album-artist"`
-	Composer string `json:"composer"`
-	Year int `json:"year"`
-	Genre string `json:"genre"`
-	Comment string `json:"comment"`
-	Codec string `json:"codec"`
-	Filename string `json:"filename"`
-	Success bool `json:"success"`
+	Composer    string `json:"composer"`
+	Year        int    `json:"year"`
+	Genre       string `json:"genre"`
+	Comment     string `json:"comment"`
+	Codec       string `json:"codec"`
+	Filename    string `json:"filename"`
+	Success     bool   `json:"success"`
 }
 
 type Version struct {
-	ControllerVersion int `json:"controller-version"`
-	MinimumClientVersion int `json:"minimum-client-version"`
+	ControllerVersion    int  `json:"controller-version"`
+	MinimumClientVersion int  `json:"minimum-client-version"`
+	Success              bool `json:"success"`
+}
+
+type AboutResponse struct {
+	Os string `json:"os"`
+	Arch string `json:"arch"`
+	GoVersion string `json:"go-version"`
+	ControllerVersion Version `json:"controller-version"`
+	ServerVersion string `json:"server-version"`
 	Success bool `json:"success"`
 }
 
 var version = Version{
-	ControllerVersion: 1,
+	ControllerVersion:    1,
 	MinimumClientVersion: 1,
-	Success: true,
+	Success:              true,
 }
 
 func GetFilesList(w http.ResponseWriter, r *http.Request) {
-	b, err := json.Marshal(managers.GetRoot())
+	b, err := json.Marshal(FilesManager.GetRoot())
 	if err != nil {
 		log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
 		authentication.SendError(w, r, err.Error())
 		return
 	}
-	w.Header().Add("Content-Type", "application/json")
-	_, err = fmt.Fprintf(w, string(b))
-	if err != nil {
-		log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
-	} else {
-		log.Printf("[INFO][%s] Getting list of files\n", r.RemoteAddr)
-	}
+	log.Printf("[INFO][%s] <--  List of files\n", r.RemoteAddr)
+	Response.SendJson(w, r, b)
 }
 
 func GetFilePathFromID(r *http.Request) (string, error) {
@@ -61,11 +70,11 @@ func GetFilePathFromID(r *http.Request) (string, error) {
 	if !ok || len(ids[0]) < 1 {
 		return "", errors.New("file ID missing")
 	}
-	id, err:= strconv.Atoi(ids[0])
+	id, err := strconv.Atoi(ids[0])
 	if err != nil {
 		return "", errors.New("file ID is NaN")
 	}
-	path, err:= managers.GetPathById(id)
+	path, err := FilesManager.GetPathById(id)
 	if err != nil {
 		return "", errors.New("file ID is not found")
 	}
@@ -73,18 +82,28 @@ func GetFilePathFromID(r *http.Request) (string, error) {
 }
 
 func GetFile(w http.ResponseWriter, r *http.Request) {
-	path, err:= GetFilePathFromID(r)
-	if err != nil {
-		log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
-		authentication.SendError(w, r, err.Error())
+	tokens, ok := r.URL.Query()["t"]
+	if !ok || len(tokens[0]) < 1 {
+		authentication.SendUnauthorized(w, r)
 		return
 	}
-	log.Printf("[INFO][%s] Serving file %s\n", r.RemoteAddr, path)
-	http.ServeFile(w, r, path)
+	token:= tokens[0]
+	if authentication.IsLogged(token) {
+		path, err := GetFilePathFromID(r)
+		if err != nil {
+			log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
+			authentication.SendError(w, r, err.Error())
+			return
+		}
+		log.Printf("[INFO][SERVING][%s] <-- %s\n", r.RemoteAddr, path)
+		http.ServeFile(w, r, path)
+	} else {
+		authentication.SendUnauthorized(w, r)
+	}
 }
 
 func GetMetaData(w http.ResponseWriter, r *http.Request) {
-	path, err:= GetFilePathFromID(r)
+	path, err := GetFilePathFromID(r)
 	if err != nil {
 		log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
 		authentication.SendError(w, r, err.Error())
@@ -101,7 +120,7 @@ func GetMetaData(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[WARN][%s] %s\n", r.RemoteAddr, err)
 		metaDataResult = Metadata{
 			Filename: filepath.Base(path),
-			Success: true,
+			Success:  true,
 		}
 	} else {
 		metaDataResult = ToOpenifyMetadata(m, filepath.Base(path))
@@ -112,28 +131,23 @@ func GetMetaData(w http.ResponseWriter, r *http.Request) {
 		authentication.SendError(w, r, err.Error())
 		return
 	}
-	w.Header().Add("Content-Type", "application/json")
-	_, err = fmt.Fprintf(w, string(b))
-	if err != nil {
-		log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
-	} else {
-		log.Printf("[INFO][%s] Getting Metadata for %s\n", r.RemoteAddr, path)
-	}
+	log.Printf("[INFO][%s] <--  File metadata\n", r.RemoteAddr)
+	Response.SendJson(w, r, b)
 }
 
 func ToOpenifyMetadata(md tag.Metadata, fn string) Metadata {
 	return Metadata{
-		Title: md.Title(),
-		Album: md.Album(),
-		Artist: md.Artist(),
+		Title:       md.Title(),
+		Album:       md.Album(),
+		Artist:      md.Artist(),
 		AlbumArtist: md.AlbumArtist(),
-		Composer: md.Composer(),
-		Year: md.Year(),
-		Genre: md.Genre(),
-		Comment: md.Comment(),
-		Codec: string(md.FileType()),
-		Filename: fn,
-		Success: true,
+		Composer:    md.Composer(),
+		Year:        md.Year(),
+		Genre:       md.Genre(),
+		Comment:     md.Comment(),
+		Codec:       string(md.FileType()),
+		Filename:    fn,
+		Success:     true,
 	}
 }
 
@@ -144,30 +158,68 @@ func GetControllerVersion(w http.ResponseWriter, r *http.Request) {
 		authentication.SendError(w, r, err.Error())
 		return
 	}
-	_, err = fmt.Fprintf(w, string(b))
-	if err != nil {
-		log.Printf("[ERROR][%s] %s\n", r.RemoteAddr, err)
-	} else {
-		log.Printf("[INFO][%s] Getting controller version\n", r.RemoteAddr)
-	}
+	log.Printf("[INFO][%s] <--  Controller version\n", r.RemoteAddr)
+	Response.SendJson(w, r, b)
 }
 
 func ReScanFolder(w http.ResponseWriter, r *http.Request) {
-	config:= managers.GetConfiguration()
-	managers.ScanFolder(config.DocumentRoot)
+	config := ConfigurationManager.GetConfiguration()
+	FilesManager.ScanFolder(config.DocumentRoot)
 	GetFilesList(w, r)
 }
 
+func About(w http.ResponseWriter, r *http.Request) {
+	about:= AboutResponse{
+		Os: runtime.GOOS,
+		Arch: runtime.GOARCH,
+		GoVersion: runtime.Version(),
+		ControllerVersion: version,
+		ServerVersion: ConfigurationManager.GetVersion(),
+		Success: true,
+	}
+
+	b, err := json.Marshal(about)
+	if err != nil {
+		log.Printf("[ERROR] %s\n", err)
+		authentication.SendError(w, r, err.Error())
+		return
+	}
+	log.Printf("[INFO][%s] <--  About\n", r.RemoteAddr)
+	Response.SendJson(w, r, b)
+}
+
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header:= r.Header.Get("authorization")
+		if len(header) > 7 {
+			token:= header[7:]
+			if authentication.IsLogged(token) {
+				next.ServeHTTP(w, r)
+			} else {
+				authentication.SendUnauthorized(w, r)
+			}
+		} else {
+			authentication.SendUnauthorized(w, r)
+		}
+	})
+}
+
 func HandleRequests() {
-	config:= managers.GetConfiguration()
+	config := ConfigurationManager.GetConfiguration()
 	log.Printf("[INFO] Server listening at %s\n", config.Port)
-	http.HandleFunc("/api/login", authentication.Signin)
-	http.HandleFunc("/api/list/files", GetFilesList)
-	http.HandleFunc("/api/get/file", GetFile)
-	http.HandleFunc("/api/get/metadata", GetMetaData)
-	http.HandleFunc("/api/system/controller/version", GetControllerVersion)
-	http.HandleFunc("/api/system/files/scan", ReScanFolder)
-	err:= http.ListenAndServe(fmt.Sprintf(":%s", config.Port), nil)
+
+	mux:= http.NewServeMux()
+	mux.HandleFunc("/api/login", authentication.Login)
+	mux.HandleFunc("/api/get/file", GetFile)
+	mux.Handle("/api/list/files", AuthMiddleware(http.HandlerFunc(GetFilesList)))
+	mux.Handle("/api/get/metadata", AuthMiddleware(http.HandlerFunc(GetMetaData)))
+	mux.Handle("/api/system/server/about", AuthMiddleware(http.HandlerFunc(About)))
+	mux.Handle("/api/system/files/scan", AuthMiddleware(http.HandlerFunc(ReScanFolder)))
+	mux.Handle("/api/system/user/register", AuthMiddleware(http.HandlerFunc(authentication.Register)))
+	mux.Handle("/api/system/controller/version", AuthMiddleware(http.HandlerFunc(GetControllerVersion)))
+	mux.Handle("/api/system/user/list", AuthMiddleware(http.HandlerFunc(authentication.GetListUsers)))
+
+	err := http.ListenAndServe(fmt.Sprintf(":%s", config.Port), mux)
 	if err != nil {
 		log.Printf("[ERROR] %s\n", err)
 	}

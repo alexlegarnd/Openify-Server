@@ -1,4 +1,4 @@
-package managers
+package ConfigurationManager
 
 import (
 	"encoding/json"
@@ -12,6 +12,11 @@ type Configuration struct {
 	Port string
 }
 
+type JWTConfig struct {
+	Key string `json:"key"`
+}
+
+var version = "1.0.0"
 var config Configuration
 
 func OpenConfiguration() Configuration {
@@ -33,6 +38,30 @@ func OpenConfiguration() Configuration {
 	return config
 }
 
+func LoadJWTKey() JWTConfig {
+	if _, err := os.Stat("jwt.json"); err != nil {
+		log.Fatalf("[ERROR] The JWT Key file is not found ::> jwt.json\n%s" +
+			"\nPlease insure that the file is in the same directory as the executable", err)
+	}
+	configJson, err:= ioutil.ReadFile("jwt.json")
+	if err != nil {
+		log.Fatalf("[ERROR] Unable to read the JWT Key file ::> jwt.json\n%s" +
+			"\nPlease insure that the file has the reading right", err)
+	}
+	var jwt JWTConfig
+	err = json.Unmarshal(configJson, &jwt)
+
+	if err != nil {
+		log.Fatalf("[ERROR] JWT Key file incorrect ::> config.json\n%s", err)
+	}
+
+	return jwt
+}
+
 func GetConfiguration() Configuration {
 	return config
+}
+
+func GetVersion() string {
+	return version
 }

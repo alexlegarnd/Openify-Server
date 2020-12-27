@@ -1,9 +1,10 @@
-package managers
+package FilesManager
 
 import (
 	"errors"
 	"fmt"
 	"log"
+	"openify/ConfigurationManager"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,7 +142,7 @@ func GetFilenameById(id int) (string, error) {
 }
 
 func GetAbsolutePath(path string) string {
-	abs:= config.DocumentRoot
+	abs:= ConfigurationManager.GetConfiguration().DocumentRoot
 	if !strings.HasSuffix(abs, string(os.PathSeparator)) {
 		abs = abs + string(os.PathSeparator)
 	}
