@@ -216,8 +216,12 @@ func HandleRequests() {
 	mux.Handle("/api/system/server/about", AuthMiddleware(http.HandlerFunc(About)))
 	mux.Handle("/api/system/files/scan", AuthMiddleware(http.HandlerFunc(ReScanFolder)))
 	mux.Handle("/api/system/user/register", AuthMiddleware(http.HandlerFunc(authentication.Register)))
-	mux.Handle("/api/system/controller/version", AuthMiddleware(http.HandlerFunc(GetControllerVersion)))
+	mux.HandleFunc("/api/system/controller/version", GetControllerVersion)
 	mux.Handle("/api/system/user/list", AuthMiddleware(http.HandlerFunc(authentication.GetListUsers)))
+	mux.Handle("/api/system/user/get", AuthMiddleware(http.HandlerFunc(authentication.GetUserInfoHandler)))
+	mux.Handle("/api/system/user/me", AuthMiddleware(http.HandlerFunc(authentication.GetLoggedUserHandler)))
+	mux.Handle("/api/system/user/remove", AuthMiddleware(http.HandlerFunc(authentication.RemoveUser)))
+	mux.Handle("/api/system/user/update", AuthMiddleware(http.HandlerFunc(authentication.UpdateUser)))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", config.Port), mux)
 	if err != nil {
