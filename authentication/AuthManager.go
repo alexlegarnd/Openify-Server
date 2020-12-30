@@ -69,11 +69,10 @@ type EditedUser struct {
 }
 
 func LoadUsers() {
-	if _, err := os.Stat("users.json"); err != nil {
-		log.Fatalf("[ERROR] The users file is not found ::> users.json\n%s" +
-			"\nPlease insure that the file is in the same directory as the executable", err)
+	if _, err := os.Stat(ConfigurationManager.GetConfiguration().UsersList); err != nil {
+		log.Fatalf("[ERROR] The users file is not found ::> users.json\n%s", err)
 	}
-	configJson, err:= ioutil.ReadFile("users.json")
+	configJson, err:= ioutil.ReadFile(ConfigurationManager.GetConfiguration().UsersList)
 	if err != nil {
 		log.Fatalf("[ERROR] Unable to read the users file ::> users.json\n%s" +
 			"\nPlease insure that the file has the reading right", err)

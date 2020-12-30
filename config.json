@@ -1,4 +1,14 @@
 {
   "DocumentRoot": "/Users/alexis/Music",
-  "Port": "4115"
+  "Port": "4115",
+  "UsersList": "./users.json",
+  "SupportedExtensions": [
+    ".mp3",
+    ".ogg",
+    ".oga",
+    ".m4a",
+    ".wav",
+    ".aiff",
+    ".flac"
+  ]
 }

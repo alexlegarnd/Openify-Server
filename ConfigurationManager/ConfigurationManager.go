@@ -10,6 +10,8 @@ import (
 type Configuration struct {
 	DocumentRoot string
 	Port string
+	UsersList string
+	SupportedExtensions []string
 }
 
 type JWTConfig struct {

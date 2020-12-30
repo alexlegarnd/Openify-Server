@@ -10,7 +10,6 @@ import (
 	"strings"
 )
 
-var supportedExt = [...]string { ".mp3", ".wav", ".ogg", ".oga", ".flac" }
 
 type File struct {
 	Name string `json:"name"`
@@ -47,7 +46,7 @@ func ScanFolder(_rootPath string) Folder {
 	}
 	log.Printf("[INFO] Scanning music folder (%s)", _rootPath)
 	err := filepath.Walk(_rootPath, func(path string, info os.FileInfo, err error) error {
-		for _, ext := range supportedExt {
+		for _, ext := range ConfigurationManager.GetConfiguration().SupportedExtensions {
 			if strings.HasSuffix(path, ext) {
 				AddToFolder(path[len(_rootPath)+1:], ext, total)
 				total++
